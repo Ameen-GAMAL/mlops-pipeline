@@ -29,7 +29,7 @@ jobs:
       - name: Configure DVC remote credentials
         run: |
           dvc remote modify origin --local auth basic
-          dvc remote modify origin --local user ${{ secrets.DAGSHUB_USERNAME }}
+          dvc remote modify origin --local user s-amin.mohamed
           dvc remote modify origin --local password ${{ secrets.DAGSHUB_TOKEN }}
 
       - name: Pull data with DVC
