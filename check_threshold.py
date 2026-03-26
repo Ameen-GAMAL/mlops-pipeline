@@ -3,7 +3,7 @@ import mlflow
 import sys
 import os
 
-THRESHOLD = 0.85
+THRESHOLD = 0.99
 
 def check():
     # Read the Run ID from the artifact
