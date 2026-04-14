@@ -20,7 +20,9 @@ def check():
     print(f"Accuracy from MLflow: {accuracy}")
 
     if accuracy < THRESHOLD:
-        print(f"FAILED: Accuracy {accuracy:.4f} is below threshold {THRESHOLD}")
+        print(
+            f"FAILED: Accuracy {
+                accuracy:.4f} is below threshold {THRESHOLD}")
         sys.exit(1)
     else:
         print(f"PASSED: Accuracy {accuracy:.4f} meets threshold {THRESHOLD}")
