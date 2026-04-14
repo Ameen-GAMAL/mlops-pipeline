@@ -1,9 +1,9 @@
 # check_threshold.py
 import mlflow
 import sys
-import os
 
 THRESHOLD = 0.99
+
 
 def check():
     # Read the Run ID from the artifact
@@ -24,6 +24,7 @@ def check():
         sys.exit(1)
     else:
         print(f"PASSED: Accuracy {accuracy:.4f} meets threshold {THRESHOLD}")
+
 
 if __name__ == "__main__":
     check()

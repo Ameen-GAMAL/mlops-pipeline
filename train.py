@@ -5,7 +5,7 @@ from sklearn.datasets import load_iris
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
-import os
+
 
 def train():
     # Load data
@@ -36,6 +36,7 @@ def train():
             f.write(run.info.run_id)
 
         print("model_info.txt written successfully.")
+
 
 if __name__ == "__main__":
     train()
