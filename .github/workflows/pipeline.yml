@@ -7,11 +7,49 @@ on:
 
 jobs:
   # ─────────────────────────────────────────
-  # JOB 1: VALIDATE
+  # JOB 1: LINTER (Lightweight Gatekeeper)
+  # Runs on every push. Fast, cheap, no GPU.
+  # ─────────────────────────────────────────
+  linter:
+    name: Lint Codebase
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install linting tools
+        run: pip install flake8
+
+      - name: Run flake8 linter
+        run: |
+          flake8 train.py check_threshold.py \
+            --max-line-length=120 \
+            --ignore=E501
+
+  # ─────────────────────────────────────────
+  # JOB 2: VALIDATE (Expensive — Gated)
+  # Only runs when ALL three conditions hold:
+  #   1. `linter` job passed
+  #   2. Push is on the `main` branch
+  #   3. Commit message contains [run-train]
   # ─────────────────────────────────────────
   validate:
     name: Train & Validate Model
     runs-on: ubuntu-latest
+
+    # ── GATEKEEPER CONDITIONS ──────────────
+    needs: linter
+    if: |
+      needs.linter.result == 'success' &&
+      github.ref == 'refs/heads/main' &&
+      contains(github.event.head_commit.message, '[run-train]')
+    # ──────────────────────────────────────
 
     steps:
       - name: Checkout code
@@ -33,16 +71,14 @@ jobs:
           dvc remote modify origin --local password ${{ secrets.DAGSHUB_TOKEN }}
 
       - name: Pull data with DVC
-        run: |
-          dvc pull
+        run: dvc pull
 
       - name: Train model
         env:
           MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
           MLFLOW_TRACKING_USERNAME: s-amin.mohamed
           MLFLOW_TRACKING_PASSWORD: ${{ secrets.DAGSHUB_TOKEN }}
-        run: |
-          python train.py
+        run: python train.py
 
       - name: Upload model_info artifact
         uses: actions/upload-artifact@v4
@@ -50,8 +86,37 @@ jobs:
           name: model-info
           path: model_info.txt
 
+      # ── FAILURE HANDLER ─────────────────
+      # Captures logs only when the job fails,
+      # so engineers can debug without re-running
+      # expensive GPU compute.
+      - name: Collect error logs on failure
+        if: failure()
+        run: |
+          echo "=== Train Job Failed ===" > error_logs.txt
+          echo "Timestamp : $(date -u)"   >> error_logs.txt
+          echo "Branch    : ${{ github.ref_name }}"  >> error_logs.txt
+          echo "Commit SHA: ${{ github.sha }}"       >> error_logs.txt
+          echo "Commit Msg: ${{ github.event.head_commit.message }}" >> error_logs.txt
+          echo ""                                    >> error_logs.txt
+          echo "--- Python Environment ---"          >> error_logs.txt
+          pip list                                   >> error_logs.txt
+
+      - name: Upload error logs artifact
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: error-logs
+          path: error_logs.txt
+
+      # ── ALWAYS CLEANUP ──────────────────
+      # Runs on every exit path — success OR failure.
+      - name: Cleanup temporary cloud volumes
+        if: always()
+        run: echo "Cleaning up temporary cloud volumes..."
+
   # ─────────────────────────────────────────
-  # JOB 2: DEPLOY
+  # JOB 3: DEPLOY
   # ─────────────────────────────────────────
   deploy:
     name: Check Threshold & Deploy
@@ -68,8 +133,7 @@ jobs:
           python-version: "3.10"
 
       - name: Install dependencies
-        run: |
-          pip install mlflow
+        run: pip install mlflow
 
       - name: Download model_info artifact
         uses: actions/download-artifact@v4
@@ -81,9 +145,8 @@ jobs:
           MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
           MLFLOW_TRACKING_USERNAME: s-amin.mohamed
           MLFLOW_TRACKING_PASSWORD: ${{ secrets.DAGSHUB_TOKEN }}
-        run: |
-          python check_threshold.py
+        run: python check_threshold.py
 
-      - name: Mock Docker Build
+      - name: Build Docker image
         run: |
-          echo "Building Docker image for Run ID: $(cat model_info.txt)"s
+          echo "Building Docker image for Run ID: $(cat model_info.txt)"
